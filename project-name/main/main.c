@@ -1,3 +1,4 @@
+// librerias
 #include <stdio.h>
 #include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
@@ -5,13 +6,14 @@
 #include "driver/ledc.h"
 #include "freertos/timers.h"
 
+// definir constantes
 #define led_red 33
 #define led_green 25
 #define led_blue 26
 #define button 27
-#define STACK_SIZE 1024
+#define STACK_SIZE 1024 
 
-
+// estructura emumerate
 typedef enum state_machine_
 {
     RED = 0,
@@ -21,17 +23,17 @@ typedef enum state_machine_
 } state_machine_t;
 
 state_machine_t state_machine;
-
+// definir estructura timer
 TimerHandle_t xTimers;
 int interval_timer = 50;
 int timerId = 1;
-
+// variables ciclo util
 int duty_red = 0;
 int duty_green = 0;
 int duty_blue = 0;
-
+// bandera
 uint8_t falling = 0;
-
+//predefinir funciones locales que se van a usar para que no existan definiciones implicitas al compilar
 esp_err_t set_pwm(void);
 esp_err_t set_pwm_duty(void);
 esp_err_t set_timer(void);
@@ -42,22 +44,22 @@ void vTimerCallback(TimerHandle_t pxTimer);
 void isr_handler(void *args);
 void vTaskbutton(void *pvParameters);
 
-
+// progrmar principal
 void app_main(void)
 {
-    
+    // setear pines
     gpio_reset_pin(button);
-    gpio_set_direction(button,GPIO_MODE_DEF_INPUT);
-    gpio_set_pull_mode(button,GPIO_PULLUP_ONLY);
+    gpio_set_direction(button,GPIO_MODE_DEF_INPUT); // como entrada
+    gpio_set_pull_mode(button,GPIO_PULLUP_ONLY); // pull up. esta permanentemente en 3.3v
     set_pwm();
     set_timer();
     create_task();
 }
 
-
+//  setear los parametros del PWM
 esp_err_t set_pwm(void)
 {
-
+    //rojo
     ledc_channel_config_t channelConfigR = {0};
     channelConfigR.gpio_num = led_red;
     channelConfigR.speed_mode = LEDC_HIGH_SPEED_MODE;
@@ -65,7 +67,7 @@ esp_err_t set_pwm(void)
     channelConfigR.intr_type = LEDC_INTR_DISABLE;
     channelConfigR.timer_sel = LEDC_TIMER_0;
     channelConfigR.duty = 0;
-
+    // verde
     ledc_channel_config_t channelConfigG = {0};
     channelConfigG.gpio_num = led_green;
     channelConfigG.speed_mode = LEDC_HIGH_SPEED_MODE;
@@ -73,7 +75,7 @@ esp_err_t set_pwm(void)
     channelConfigG.intr_type = LEDC_INTR_DISABLE;
     channelConfigG.timer_sel = LEDC_TIMER_0;
     channelConfigG.duty = 0;
-
+    // azul
     ledc_channel_config_t channelConfigB = {0};
     channelConfigB.gpio_num = led_blue;
     channelConfigB.speed_mode = LEDC_HIGH_SPEED_MODE;
@@ -81,41 +83,41 @@ esp_err_t set_pwm(void)
     channelConfigB.intr_type = LEDC_INTR_DISABLE;
     channelConfigB.timer_sel = LEDC_TIMER_0;
     channelConfigB.duty = 0;
-
+    // configuracion canal LEDC (PWM)
     ledc_channel_config(&channelConfigR);
     ledc_channel_config(&channelConfigG);
     ledc_channel_config(&channelConfigB);
-
+    // configuracion de los parametros del timer del canal del PWM
     ledc_timer_config_t timerConfig = {0};
     timerConfig.speed_mode = LEDC_HIGH_SPEED_MODE;
     timerConfig.duty_resolution = LEDC_TIMER_10_BIT;
     timerConfig.timer_num = LEDC_TIMER_0;
     timerConfig.freq_hz = 20000;
-
+    // configuracion canal TIMER
     ledc_timer_config(&timerConfig);
 
     return ESP_OK;
 }
-
+// configurar el ciclo util al que van a funcionar los leds
 esp_err_t set_pwm_duty(void)
 {
-
+    //setear
     ledc_set_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_0, duty_red);
     ledc_set_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_1, duty_green);
     ledc_set_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_2, duty_blue);
-
+    // actualizar
     ledc_update_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_0);
     ledc_update_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_1);
     ledc_update_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_2);
 
     return ESP_OK;
 }
-
+// funcion cuando pasa el time out
 void vTimerCallback(TimerHandle_t pxTimer)
 {
 
     if (falling == 0)
-    {
+    {   // aumentar intensidad
         switch (state_machine)
         {
         case RED:
@@ -135,7 +137,7 @@ void vTimerCallback(TimerHandle_t pxTimer)
         }
     }
     if (falling == 1)
-    {
+    {   // bajar intensidad
         switch (state_machine)
         {
         case RED:
@@ -154,7 +156,7 @@ void vTimerCallback(TimerHandle_t pxTimer)
             break;
         }
     }
-
+    // cambio de la bandera al llegar a los extremos
     if (((duty_red + duty_blue + duty_green) >= 1000) && (falling == 0))
     {
         falling = 1;
@@ -167,7 +169,7 @@ void vTimerCallback(TimerHandle_t pxTimer)
 
     set_pwm_duty();
 }
-
+// configuracion timer
 esp_err_t set_timer(void)
 {
     printf("timer init \r\n");
@@ -194,7 +196,7 @@ esp_err_t set_timer(void)
 
     return ESP_OK;
 }
-
+// RTOS tarea
 esp_err_t create_task(void)
 {
 
