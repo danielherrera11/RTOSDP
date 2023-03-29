@@ -8,6 +8,7 @@
 #include "freertos/timers.h"
 #include "driver/adc.h"
 #include "driver/uart.h"
+#include <math.h>
 
 /* Private Define*/
 
@@ -47,6 +48,12 @@ uint8_t debounce_state =0;
 
 // define adc valor 
 float adc_val = 0;
+// define standar values of the termistor
+double Beta = 3950.0;  // Beta value
+double To = 25;    // Temperature standar in Celsius
+double Ro = 5;   // Resistance of Thermistor at 25 degree Celsius
+float Rt = 0;
+float T = 0;
 
 // speed value of change for the LED
 volatile uint8_t speed_value = 5;
@@ -107,24 +114,28 @@ static void temperature_task(void *pvParameters)
     while (1)
     {
         adc_val = adc1_get_raw(ADC1_CHANNEL_6);
-        /*todo Config ADC to show Temperature*/
+        /*Config ADC to show Temperature*/
         adc_val = (adc_val*3.3)/4096;
+        // Resistance of the termistor
+        Rt = 15 * adc_val / (3.3 - adc_val);
+        // temperature in celsius
+        T = 1/(1/To + log(Rt/Ro)/Beta);
 
         // states of the LEDS
-        if(adc_val <= 1){
+        if(T <= 25){
             temperature_control = COLD;
             gpio_set_level(led_red,0);
             gpio_set_level(led_green,0);
             gpio_set_level(led_blue,1);
             gpio_set_level(led_warning,0);
-        }else if (adc_val <= 2)
+        }else if (T <= 26)
         {
             temperature_control = WARM;
             gpio_set_level(led_red,0);
             gpio_set_level(led_green,1);
             gpio_set_level(led_blue,0);
             gpio_set_level(led_warning,0);
-        }else if (adc_val <= 3)
+        }else if (T <= 27)
         {
             temperature_control = HOT;
             gpio_set_level(led_red,1);
@@ -140,8 +151,9 @@ static void temperature_task(void *pvParameters)
         }
         //print on monitor
         char* Txdata = (char*) malloc(100);
-        sprintf (Txdata, "The temperature is : %f\r\n", adc_val);
+        sprintf (Txdata, "The temperature is : %f\r\n", T);
         
+
         uart_write_bytes(UART_NUM, Txdata, strlen(Txdata));
         vTaskDelay(pdMS_TO_TICKS(1000));
 
