@@ -1,1 +1,14 @@
-1c75d047307882c582a4dd046f582bf77a91490d
+0000000000000000000000000000000000000000 2214d8814f9cb99380100af63c53bdbca1acd198 danielherrera11 <dplatah@unal.edu.co> 1678850604 -0500	branch: Created from main
+2214d8814f9cb99380100af63c53bdbca1acd198 0595536335e9ab6b47bd8607af4c4d5c2dab2693 danielherrera11 <dplatah@unal.edu.co> 1678850666 -0500	commit: Se agrego el proyecto de la entrega 1
+0595536335e9ab6b47bd8607af4c4d5c2dab2693 39b6da819a0505208b330980f8783f6ec3b45534 danielherrera11 <dplatah@unal.edu.co> 1678855521 -0500	commit: comentar codigo
+39b6da819a0505208b330980f8783f6ec3b45534 239113a54cd9a6487faeceefd8acdefff434e69d danielherrera11 <dplatah@unal.edu.co> 1678895514 -0500	commit: Cambio del nombre del proyecto, (tenia un nombre default)
+239113a54cd9a6487faeceefd8acdefff434e69d aa4142b3d6a75fbf5b0f4f229d014e84f8e3840d danielherrera11 <dplatah@unal.edu.co> 1678899005 -0500	commit: Actualizacion ReadMe
+aa4142b3d6a75fbf5b0f4f229d014e84f8e3840d bc3f2ebebf1616bbcc55989a57c3bf10e40a091c danielherrera11 <dplatah@unal.edu.co> 1678899464 -0500	commit: Modificacion comentario ReadMe
+bc3f2ebebf1616bbcc55989a57c3bf10e40a091c 6e82e70e69c1f44fb8222023a91f709201d2d578 danielherrera11 <dplatah@unal.edu.co> 1678899509 -0500	commit: Modificacion readme
+6e82e70e69c1f44fb8222023a91f709201d2d578 62892d107fd8fcbda92a58897b8037c4962a9f21 danielherrera11 <dplatah@unal.edu.co> 1678899555 -0500	commit: Modificacion read me.
+62892d107fd8fcbda92a58897b8037c4962a9f21 07965facfdad03307fafc71e1b75f3b3a2709a70 danielherrera11 <dplatah@unal.edu.co> 1678899606 -0500	commit: GRAMMAR
+07965facfdad03307fafc71e1b75f3b3a2709a70 9e961b3b8bb6edf91da41667cbbed88cef85e23d danielherrera11 <dplatah@unal.edu.co> 1679276867 -0500	commit: Creacion tarea 2 ADC
+9e961b3b8bb6edf91da41667cbbed88cef85e23d e44bdfcad52b2f86951c9e8ee0f9999479fd42a6 danielherrera11 <dplatah@unal.edu.co> 1679520352 -0500	commit: Creacion proyecto UART-TERMISTOR
+e44bdfcad52b2f86951c9e8ee0f9999479fd42a6 ccd924c862ccc3f1017fe97c29473254ec6e38e9 danielherrera11 <dplatah@unal.edu.co> 1679977360 -0500	commit: Coments Entrega2
+ccd924c862ccc3f1017fe97c29473254ec6e38e9 1c75d047307882c582a4dd046f582bf77a91490d danielherrera11 <dplatah@unal.edu.co> 1680067872 -0500	commit: change value read, from adc_val in voltage to T in celsius
+1c75d047307882c582a4dd046f582bf77a91490d 33baef64d99725bcbfe0e5e26bc59a176886e6b7 danielherrera11 <dplatah@unal.edu.co> 1681318524 -0500	commit: Project UART-MODIFICARESTADOS was created, this project allows the user to change the limits of when each LED turn on

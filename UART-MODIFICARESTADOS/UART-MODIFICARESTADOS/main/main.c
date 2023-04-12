@@ -27,7 +27,7 @@
 #define BUF_SIZE 1024
 
 // define standar values of the termistor
-double Beta = 3950.0;  // Beta value
+double Beta = 3096.0;  // Beta value
 double To = 25;    // Temperature standar in Celsius
 double Ro = 5;   // Resistance of Thermistor at 25 degree Celsius
 float Rt = 0;
@@ -146,7 +146,7 @@ static void temperature_task(void *pvParameters)
         adc_val = 1/(1/To + log(Rt/Ro)/Beta);
         
         
-        // STATE of the leds
+        // config the STATE of the leds
         if ((adc_val < red_min) || (adc_val > red_max)){
             gpio_set_level(led_red,0);
         }else{
@@ -230,18 +230,19 @@ static void uart_task(void *pvParameters)
                 break;
             
             case PREAMBLE_CHECK:
+                // the user chooses the min value
                 if(data[index] == '$'){
                     state_machine = MINIM_CHECK;
                 }else{
                     state_machine = INIT;
                 }
                 break;
-
+                // the user chooses the max value
             case MINIM_CHECK:
                 if(data[index] == '$'){
                     state_machine = MAX_CHECK;
                 }else{
-                    // ensure is a number a
+                    // ensure is a number 
                     if((data[index] < 48) || (data[index] > 57)){
                         state_machine = INIT;
                     }
@@ -328,7 +329,7 @@ static void timer_cb(TimerHandle_t pxTimer){
 
 }
 
-// this function aboid debouncing problem with the buttons
+// this function avoid debouncing problem with the buttons
 static void debounce_timer_cb(TimerHandle_t pxTimer){
     debounce_state =0;
 
