@@ -8,7 +8,6 @@
 #include "freertos/timers.h"
 #include "driver/adc.h"
 #include "driver/uart.h"
-#include <math.h>
 
 /* Private Define*/
 
@@ -21,19 +20,10 @@
 
 #define STACK_SIZE 2048
 
-// define the UART that is connected to the USB port
 #define UART_NUM UART_NUM_0
-// define size to recieve Rx data
 #define BUF_SIZE 1024
 
-// define standar values of the termistor
-double Beta = 3096.0;  // Beta value
-double To = 25;    // Temperature standar in Celsius
-double Ro = 5;   // Resistance of Thermistor at 25 degree Celsius
-float Rt = 0;
-float T = 0;
 
-// define variables of the state machine
 typedef enum temperature_control_
 {
     COLD = 0,
@@ -45,7 +35,7 @@ typedef enum temperature_control_
 temperature_control_t temperature_control;
 
 
-// define of a second state machine
+
 typedef enum state_machine_
 {
     INIT = 0,
@@ -53,13 +43,19 @@ typedef enum state_machine_
     PREAMBLE_CHECK,
     MINIM_CHECK,
     MAX_CHECK,
+    CAUTIN,
+    HISTERESIS,
 } state_machine_t;
 
 state_machine_t state_machine;
 
 /* Private Global V */
 
-// threhold of state change
+
+
+uint8_t counter_prom=0;
+float acumulable_temp = 0;
+
 uint16_t blue_min = 20;
 uint16_t blue_max = 30;
 
@@ -70,16 +66,19 @@ uint16_t red_min = 40;
 uint16_t red_max = 50;
 uint8_t led_to_change = 0;//RED = 1, BLUe = 2, GREEN = 3
 
+
+uint8_t desired_temperature = 50;
+uint8_t histeresis = 10;
+
 TimerHandle_t xTimers;
 TimerHandle_t xdebounceTimers;
 int timerId = 1;
 int debounce_timerId = 2;
 uint8_t debounce_state =0;
-// define adc valor
+
 float adc_val = 0;
 float temperature = 0;
 
-//define value of change for the LED
 volatile uint8_t speed_value = 5;
 
 uint8_t led_warning_state = 0;
@@ -100,7 +99,7 @@ void app_main(void)
 }
 
 void peripheral_config(void){
-    // set and direct GPIO pins
+    
     gpio_reset_pin(led_red);
     gpio_set_direction(led_red, GPIO_MODE_OUTPUT);
 
@@ -112,11 +111,10 @@ void peripheral_config(void){
 
     gpio_reset_pin(led_warning);
     gpio_set_direction(led_warning, GPIO_MODE_OUTPUT);
-   
-    //set adn width of the ADC
+
     adc1_config_channel_atten(ADC1_CHANNEL_6, ADC_ATTEN_DB_11);
     adc1_config_width(ADC_WIDTH_BIT_12);
-    // configuration UART
+
     uart_config_t uart_config = {
         .baud_rate = 115200,
         .data_bits = UART_DATA_8_BITS,
@@ -137,53 +135,68 @@ static void temperature_task(void *pvParameters)
     /* Each sec read Temperature value*/
     while (1)
     {
-        adc_val = adc1_get_raw(ADC1_CHANNEL_6);
-        /*Config ADC to show Temperature*/
-        adc_val = (adc_val*3.3)/4096;
-        // Resistance of the termistor
-        Rt = 15 * adc_val / (3.3 - adc_val);
-        // temperature in celsius
-        adc_val = 1/(1/To + log(Rt/Ro)/Beta);
-        
-        
-        // config the STATE of the leds
-        if ((adc_val < red_min) || (adc_val > red_max)){
-            gpio_set_level(led_red,0);
-        }else{
-            gpio_set_level(led_red,1);
-        }
 
-        if ((adc_val < green_min) || (adc_val > green_max)){
-            gpio_set_level(led_green,0);
-        }else{
-            gpio_set_level(led_green,1);
-        }
+        if(counter_prom < 10){
+            float temporal_adc_value = 0;
+            temporal_adc_value = adc1_get_raw(ADC1_CHANNEL_6);
+            /*todo Config ADC to show Temperature*/
+            temporal_adc_value = (temporal_adc_value*100)/4096;
+            acumulable_temp = acumulable_temp + temporal_adc_value;
+            counter_prom++;
+            
 
-        if ((adc_val < blue_min) || (adc_val > blue_max)){
-            gpio_set_level(led_blue,0);
+
         }else{
-            gpio_set_level(led_blue,1);
+
+            temperature = acumulable_temp / 10;
+            acumulable_temp = 0;
+            counter_prom =0;
+
+            if(temperature < desired_temperature){
+                gpio_set_level(led_warning,1);
+            }else{
+                gpio_set_level(led_warning,0);
+            }
+            if (temperature > desired_temperature- histeresis){
+                if(temperature< desired_temperature){
+                    gpio_set_level(led_blue,1);
+                }else{
+                    gpio_set_level(led_blue,0);
+                }
+                if(temperature> desired_temperature){
+                    gpio_set_level(led_red,1);
+                }else{
+                    gpio_set_level(led_red,0);
+                }
+                if(temperature < desired_temperature+histeresis){
+                    gpio_set_level(led_green,1);
+                }else{
+                    gpio_set_level(led_green,0);
+                }
+
+            }
+            else{
+                gpio_set_level(led_green,0);
+                gpio_set_level(led_red,0);
+                gpio_set_level(led_blue,0);
+
+
+            }
+
+
+            
+
+            char* Txdata = (char*) malloc(200);
+            // sprintf (Txdata, "The temperature is : %f\r\n", temperature);
+            sprintf (Txdata, "objetive : %d  histeresis: %d cautin:%f \r\n", desired_temperature, histeresis, temperature);
+            uart_write_bytes(UART_NUM, Txdata, strlen(Txdata));
+
         }
         
-        if(adc_val <= 20){
-            temperature_control = COLD;
-        }else if (adc_val <= 30){
-            temperature_control = WARM;
-        }else if (adc_val <= 40){
-            temperature_control = HOT;
-        }else{
-            temperature_control = WARNING;
-        }
-        // print on monitor
-        char* Txdata = (char*) malloc(100);
-        sprintf (Txdata, "The temperature is : %f\r\n", adc_val);
-        // sprintf (Txdata, "red_min : %d  red max: %d\r\n", red_min, red_max);
-        uart_write_bytes(UART_NUM, Txdata, strlen(Txdata));
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(100));
 
     }
 }
-
 
 static void uart_task(void *pvParameters)
 {
@@ -191,14 +204,12 @@ static void uart_task(void *pvParameters)
     /* Each sec read Temperature value*/
     while (1)
     {
-        // define variables for the second state machine
         bzero(data,BUF_SIZE);
         uint16_t temporal_min = 0;
         uint16_t temporal_max = 0;
         uint8_t index = 0;
-        led_to_change =0;
+        led_to_change = 0;
         state_machine = INIT;
-        index = 0;
 
 
         int len = uart_read_bytes(UART_NUM,data,BUF_SIZE,pdMS_TO_TICKS(100));
@@ -208,9 +219,22 @@ static void uart_task(void *pvParameters)
             switch (state_machine)
             {
             case INIT:
+                if(data[index] == '#'){
                 
+                    if((data[index]=='#')&&(data[index+1]=='S')&&(data[index+2]=='E')&&(data[index+3]=='T')&&(data[index+4]=='_')&&(data[index+5]=='H')&&(data[index+6]=='I')&&(data[index+7]=='S')&&(data[index+8]=='T')){
+                        state_machine = HISTERESIS;
+                        index = index + 8;
+
+                    }
+                    if((data[index]=='#')&&(data[index+1]=='S')&&(data[index+2]=='E')&&(data[index+3]=='T')&&(data[index+4]=='_')&&(data[index+5]=='T')&&(data[index+6]=='E')&&(data[index+7]=='M')&&(data[index+8]=='P')){
+                        state_machine = CAUTIN;
+                        index = index + 8;
+                    }
+
+                    
+                }
                 if((len-index)>5){
-                    // ensure the user choose a valid LED
+
                     if((data[index]=='R')&&(data[index+1]=='E')&&(data[index+2]=='D')){
                         index = index + 2;
                         led_to_change = 1;
@@ -230,24 +254,21 @@ static void uart_task(void *pvParameters)
                 break;
             
             case PREAMBLE_CHECK:
-                // the user chooses the min value
                 if(data[index] == '$'){
                     state_machine = MINIM_CHECK;
                 }else{
                     state_machine = INIT;
                 }
                 break;
-                // the user chooses the max value
+
             case MINIM_CHECK:
                 if(data[index] == '$'){
                     state_machine = MAX_CHECK;
                 }else{
-                    // ensure is a number 
                     if((data[index] < 48) || (data[index] > 57)){
                         state_machine = INIT;
                     }
                     else{
-                        // save digit by digit
                         temporal_min = temporal_min*10;
                         temporal_min = temporal_min+(data[index]-48);
                     }
@@ -281,6 +302,43 @@ static void uart_task(void *pvParameters)
                     }
                 }
                 break;
+
+            case CAUTIN:
+                
+                if((data[index]=='$')&&(data[index+3]=='$')){
+                    if(((data[index+1] < 48) || (data[index+1] > 57))||((data[index+2] < 48) || (data[index+2] > 57))){
+                        state_machine = INIT;
+                    }else{
+                        uint8_t acumulator = 0;
+                        acumulator = data[index+1] - 48;
+                        acumulator = acumulator * 10;
+                        acumulator = acumulator + (data[index+2] - 48);
+                        desired_temperature = acumulator;
+                    }
+
+                }
+                
+
+                break;
+
+            case HISTERESIS:
+                if((len-index)>3){
+                    if((data[index]=='$')&&(data[index+3]=='$')){
+                        if(((data[index+1] < 48) || (data[index+1] > 57))||((data[index+2] < 48) || (data[index+2] > 57))){
+                            state_machine = INIT;
+                        }else{
+                            uint8_t acumulator = 0;
+                            acumulator = data[index+1] - 48;
+                            acumulator = acumulator * 10;
+                            acumulator = acumulator + (data[index+2] - 48);
+                            histeresis = acumulator;
+                        }
+
+                    }
+                }
+
+                break;
+
             default:
                 break;
             
@@ -315,27 +373,25 @@ void task_config(void){
 }
 
 /* Timer stack*/
-// callback time, every time time runs off the speed value will change depending on the new speed value after button press
+
 static void timer_cb(TimerHandle_t pxTimer){
-    if(adc_val > 3){
-        gpio_set_level(led_warning,led_warning_state);
-        if(led_warning_state == 0){
-            led_warning_state =1;
-        }else{
-            led_warning_state = 0;
-        }
-    }
+    // if(adc_val > 3){
+    //     gpio_set_level(led_warning,led_warning_state);
+    //     if(led_warning_state == 0){
+    //         led_warning_state =1;
+    //     }else{
+    //         led_warning_state = 0;
+    //     }
+    // }
     timer_config();
 
 }
 
-// this function avoid debouncing problem with the buttons
 static void debounce_timer_cb(TimerHandle_t pxTimer){
     debounce_state =0;
 
 }
 
-// timer configuration
 void timer_config(void){
     
 
@@ -368,33 +424,32 @@ void timer_config(void){
 /* Interruption stack*/
 
 /* Private CB*/
-// function when I press button down
+
 void button1_handler(void *args){
     if(debounce_state){
         return;
     }
     debounce_state =1;
 
-    if(speed_value > 1){
-        speed_value = speed_value -1;
+    if(desired_temperature > 5){
+        desired_temperature = desired_temperature -5;
     }
 
 }
 
-// function when I press button up
 void button2_handler(void *args){
     if(debounce_state){
         return;
     }
     debounce_state =1;
 
-    if(speed_value < 20){
-        speed_value = speed_value + 1;
+    if(desired_temperature < 95){
+        desired_temperature = desired_temperature + 5;
     }
 
 }
 
-// configuration interruption
+
 void isr_config(void){
     gpio_config_t pGPIOConfig1;
     
