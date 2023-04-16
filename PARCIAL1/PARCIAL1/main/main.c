@@ -388,14 +388,7 @@ void task_config(void){
 /* Timer stack*/
 
 static void timer_cb(TimerHandle_t pxTimer){
-    // if(adc_val > 3){
-    //     gpio_set_level(led_warning,led_warning_state);
-    //     if(led_warning_state == 0){
-    //         led_warning_state =1;
-    //     }else{
-    //         led_warning_state = 0;
-    //     }
-    // }
+   
     timer_config();
 
 }
