@@ -23,7 +23,7 @@
 #define UART_NUM UART_NUM_0
 #define BUF_SIZE 1024
 
-
+// define the temperature structure
 typedef enum temperature_control_
 {
     COLD = 0,
@@ -35,7 +35,7 @@ typedef enum temperature_control_
 temperature_control_t temperature_control;
 
 
-
+// define the state machine structure 
 typedef enum state_machine_
 {
     INIT = 0,
@@ -66,24 +66,28 @@ uint16_t red_min = 40;
 uint16_t red_max = 50;
 uint8_t led_to_change = 0;//RED = 1, BLUe = 2, GREEN = 3
 
-
+// define initial values of temperature and histeresis
 uint8_t desired_temperature = 50;
 uint8_t histeresis = 10;
 
+// define timer parameters
 TimerHandle_t xTimers;
 TimerHandle_t xdebounceTimers;
 int timerId = 1;
 int debounce_timerId = 2;
 uint8_t debounce_state =0;
 
+//define the value the ADC reads and the temperature
 float adc_val = 0;
 float temperature = 0;
+
 
 volatile uint8_t speed_value = 5;
 
 uint8_t led_warning_state = 0;
 /* Private function define*/
 
+//define each indibidual function, in order to avoid errors of intrinsic definition
 void peripheral_config(void);
 void task_config(void);
 void timer_config(void);
@@ -99,7 +103,7 @@ void app_main(void)
 }
 
 void peripheral_config(void){
-    
+    //set and
     gpio_reset_pin(led_red);
     gpio_set_direction(led_red, GPIO_MODE_OUTPUT);
 

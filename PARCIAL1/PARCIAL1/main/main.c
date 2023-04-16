@@ -8,6 +8,7 @@
 #include "freertos/timers.h"
 #include "driver/adc.h"
 #include "driver/uart.h"
+#include <math.h>
 
 /* Private Define*/
 
@@ -23,7 +24,7 @@
 #define UART_NUM UART_NUM_0
 #define BUF_SIZE 1024
 
-
+// define temperature structure
 typedef enum temperature_control_
 {
     COLD = 0,
@@ -35,7 +36,7 @@ typedef enum temperature_control_
 temperature_control_t temperature_control;
 
 
-
+// define state machine structure
 typedef enum state_machine_
 {
     INIT = 0,
@@ -53,9 +54,17 @@ state_machine_t state_machine;
 
 
 
+// define standar values of the termistor
+double Beta = 3096.0;  // Beta value
+double To = 25;    // Temperature standar in Celsius
+double Ro = 5;   // Resistance of Thermistor at 25 degree Celsius
+float Rt = 0;
+float T = 0;
+
 uint8_t counter_prom=0;
 float acumulable_temp = 0;
 
+//RED = 1, BLUe = 2, GREEN = 3
 uint16_t blue_min = 20;
 uint16_t blue_max = 30;
 
@@ -64,26 +73,30 @@ uint16_t green_max = 40;
 
 uint16_t red_min = 40;
 uint16_t red_max = 50;
-uint8_t led_to_change = 0;//RED = 1, BLUe = 2, GREEN = 3
+uint8_t led_to_change = 0;
 
-
+// define initial values of desired temperature and histeris, they can be change
 uint8_t desired_temperature = 50;
 uint8_t histeresis = 10;
 
+// define timer parameters
 TimerHandle_t xTimers;
 TimerHandle_t xdebounceTimers;
 int timerId = 1;
 int debounce_timerId = 2;
 uint8_t debounce_state =0;
 
+// define the variables for the ADC and the temperature
 float adc_val = 0;
 float temperature = 0;
 
+// define initial speed value
 volatile uint8_t speed_value = 5;
 
 uint8_t led_warning_state = 0;
 /* Private function define*/
 
+// define functions that will be used in the code, to avoid intrisic definition
 void peripheral_config(void);
 void task_config(void);
 void timer_config(void);
@@ -99,7 +112,7 @@ void app_main(void)
 }
 
 void peripheral_config(void){
-    
+    //set and direct GPIOs
     gpio_reset_pin(led_red);
     gpio_set_direction(led_red, GPIO_MODE_OUTPUT);
 
@@ -114,7 +127,7 @@ void peripheral_config(void){
 
     adc1_config_channel_atten(ADC1_CHANNEL_6, ADC_ATTEN_DB_11);
     adc1_config_width(ADC_WIDTH_BIT_12);
-
+    //set uart parameters
     uart_config_t uart_config = {
         .baud_rate = 115200,
         .data_bits = UART_DATA_8_BITS,
@@ -139,8 +152,13 @@ static void temperature_task(void *pvParameters)
         if(counter_prom < 10){
             float temporal_adc_value = 0;
             temporal_adc_value = adc1_get_raw(ADC1_CHANNEL_6);
-            /*todo Config ADC to show Temperature*/
-            temporal_adc_value = (temporal_adc_value*100)/4096;
+            temporal_adc_value = (temporal_adc_value*3.3)/4096;
+            // Resistance of the termistor
+            Rt = 15 * temporal_adc_value / (3.3 - temporal_adc_value);
+            // temperature in celsius
+            temporal_adc_value = 1/(1/To + log(Rt/Ro)/Beta);
+            
+            
             acumulable_temp = acumulable_temp + temporal_adc_value;
             counter_prom++;
             
@@ -151,7 +169,7 @@ static void temperature_task(void *pvParameters)
             temperature = acumulable_temp / 10;
             acumulable_temp = 0;
             counter_prom =0;
-
+            // this is the logic for each LED
             if(temperature < desired_temperature){
                 gpio_set_level(led_warning,1);
             }else{
@@ -177,7 +195,7 @@ static void temperature_task(void *pvParameters)
             }
 
             
-
+            // print the temperature value
             char* Txdata = (char*) malloc(100);
             // sprintf (Txdata, "The temperature is : %f\r\n", temperature);
             sprintf (Txdata, "objetive : %d  histeresis: %d cautin: %f \r\n", desired_temperature, histeresis, temperature);
@@ -207,17 +225,18 @@ static void uart_task(void *pvParameters)
         int len = uart_read_bytes(UART_NUM,data,BUF_SIZE,pdMS_TO_TICKS(100));
 
         while(index <= len){
-
+            // create the state machine to define what the user is allowed to enter as input
             switch (state_machine)
             {
             case INIT:
+                // the correct input to change the histeresis value is: #SET_HIST$xx$
                 if(data[index] == '#'){
                 
                     if((data[index]=='#')&&(data[index+1]=='S')&&(data[index+2]=='E')&&(data[index+3]=='T')&&(data[index+4]=='_')&&(data[index+5]=='H')&&(data[index+6]=='I')&&(data[index+7]=='S')&&(data[index+8]=='T')){
                         state_machine = HISTERESIS;
                         index = index + 8;
 
-                    }
+                    } // the correct input to change the histeresis value is: #SET_TEMP$xx$
                     if((data[index]=='#')&&(data[index+1]=='S')&&(data[index+2]=='E')&&(data[index+3]=='T')&&(data[index+4]=='_')&&(data[index+5]=='T')&&(data[index+6]=='E')&&(data[index+7]=='M')&&(data[index+8]=='P')){
                         state_machine = CAUTIN;
                         index = index + 8;
@@ -254,6 +273,7 @@ static void uart_task(void *pvParameters)
                 break;
 
             case MINIM_CHECK:
+                // this ensures the user's input is valid
                 if(data[index] == '$'){
                     state_machine = MAX_CHECK;
                 }else{
@@ -346,6 +366,7 @@ static void uart_task(void *pvParameters)
     }
 }
 
+
 void task_config(void){
     static uint8_t ucParameterToPass;
     TaskHandle_t xHandle = NULL;
@@ -417,6 +438,7 @@ void timer_config(void){
 
 /* Private CB*/
 
+// this button decreases the desired temperature by 5
 void button1_handler(void *args){
     if(debounce_state){
         return;
@@ -429,6 +451,7 @@ void button1_handler(void *args){
 
 }
 
+// this button increases the desired temperature by 5
 void button2_handler(void *args){
     if(debounce_state){
         return;
@@ -441,7 +464,7 @@ void button2_handler(void *args){
 
 }
 
-
+// config interruption
 void isr_config(void){
     gpio_config_t pGPIOConfig1;
     
